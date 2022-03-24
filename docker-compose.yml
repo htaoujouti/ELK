@@ -12,10 +12,10 @@ services:
     ports:
     - 9200:9200
     environment:
-      - node.name = elasticsearch
-      - http.host = 0.0.0.0
-      - transport.host = localhost
-      - network.host = 0.0.0.0
+      - node.name="elasticsearch"
+      - http.host=0.0.0.0
+      - transport.host=localhost
+      - network.host=0.0.0.0
       - "ES_JAVA_OPTS=-Xms4g -Xmx4g -Dlog4j2.formatMsgNolookups=true"
     ulimits:
       memlock:
@@ -27,13 +27,11 @@ services:
     container_name: kibana
     image: docker.elastic.co/kibana/kibana:7.10.2
     ports:
-      - 5061:5061
+      - 5601:5601
     environment:
-      - server.host = "0.0.0.0"
-      - server.shutdownTimeout = "5s"
-      - elasticsearch.hosts = http://elasticsearch:9200
-      - monitoring.ui.container.elasticsearch.enabled = true
-      - ELASTICSEARCH_URL = http://elasticsearch:9200      
+      - server.host="0.0.0.0"
+      - elasticsearch.hosts=http://elasticsearch:9200
+      - monitoring.ui.container.elasticsearch.enabled=true  
     volumes:
       - ./kibana.yml:/usr/share/kibana/config/kibana.yml
     restart: always
