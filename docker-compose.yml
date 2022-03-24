@@ -8,6 +8,7 @@ services:
       - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
       - ./jvm.options:/usr/share/elasticsearch/config/jvm.options
       - index_data:/usr/share/elasticsearch/data
+      - backup:/usr/share/elasticsearch/backup
     ports:
     - 9200:9200
     environment:
@@ -22,4 +23,27 @@ services:
         hard: -5
     mem_limit: 5g
     restart: always
+  kibana:
+    container_name: kibana
+    image: docker.elastic.co/kibana/kibana:7.10.2
+    ports:
+      - 5061:5061
+    environment:
+      - server.host = "0.0.0.0"
+      - server.shutdownTimeout = "5s"
+      - elasticsearch.hosts = http://elasticsearch:9200
+      - monitoring.ui.container.elasticsearch.enabled = true
+      - ELASTICSEARCH_URL = http://elasticsearch:9200      
+    volumes:
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
+    restart: always
+    depends_on: 
+      elasticsearch:
+        condition: "service_started"
+volumes:
+  index_data:
+    driver: local
+  backup:
+    driver: local
+
 
