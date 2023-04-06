@@ -5,16 +5,12 @@ networks:
 volumes:
   index_data:
     driver: local
-  apm-server:
-    driver: local
-  fleet-server:
-    driver: local
 services:
   elasticsearch:
     container_name: elasticsearch
     image: docker.elastic.co/elasticsearch/elasticsearch:7.10.2
     volumes:
-      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:rw,Z
       # - ./jvm.options:/usr/share/elasticsearch/config/jvm.options
       - index_data:/usr/share/elasticsearch/data
     ports:
@@ -28,7 +24,7 @@ services:
       transport.host: localhost
       network.host: 0.0.0.0
       # ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
-      discovery.type: single-node
+      # discovery.type: single-node
     ulimits:
       memlock:
         soft: -1
@@ -43,23 +39,21 @@ services:
     ports:
       - 5000:5000
     environment:
-      LS_JAVA_OPTS: -Xmx512m -Xms512m
+      LS_JAVA_OPTS: -Xmx1g -Xms1g
       Dlog4j2.formatMsgNolookups: true
       http.host: "0.0.0.0"
       node.name: logstash
       monitoring.elasticsearch.hosts: http://elasticsearch:9200
       # LOGSTASH_INTERNAL_PASSWORD: ${LOGSTASH_INTERNAL_PASSWORD:-}
-    # volumes:
-    #   - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
-      # - /var/log/GDPR/myapplication:/var/log/GDPR/myapplication:ro
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:rw,Z
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:rw,Z
     restart: unless-stopped
     depends_on: 
       elasticsearch:
         condition: "service_started"
     networks:
       - elk      
-    links:
-      - elasticsearch
   kibana:
     container_name: kibana
     image: docker.elastic.co/kibana/kibana:7.10.2
@@ -71,28 +65,29 @@ services:
       monitoring.ui.container.elasticsearch.enabled: true 
       # KIBANA_SYSTEM_PASSWORD: ${KIBANA_SYSTEM_PASSWORD:-} 
     volumes:
-      - ./kibana.yml:/usr/share/kibana/config/kibana.yml
-      # - ./kibana/config/:/usr/share/kibana/config:ro
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml:rw,Z
     restart: unless-stopped
     depends_on: 
       elasticsearch:
         condition: "service_started"
     networks:
       - elk
-    links:
-      - elasticsearch
 
   heartbeat:
     container_name: heartbeat
     image: docker.elastic.co/beats/heartbeat:7.10.2
     command:
+      # Log to stderr.
       - -e
+      # Disable config file permissions checks. Allows mounting
+      # 'config/metricbeat.yml' even if it's not owned by root.
+      # see: https://www.elastic.co/guide/en/beats/libbeat/current/config-file-permissions.html
       - --strict.perms=false
     volumes:
-      - .heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro,Z
-    environment:
-      HEARTBEAT_INTERNAL_PASSWORD: ${HEARTBEAT_INTERNAL_PASSWORD:-}
-      BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
+      - ./heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:rw,Z
+    # environment:
+    #   HEARTBEAT_INTERNAL_PASSWORD: ${HEARTBEAT_INTERNAL_PASSWORD:-}
+    #   BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
     networks:
       - elk
     depends_on:
@@ -103,10 +98,14 @@ services:
     image: docker.elastic.co/beats/filebeat:7.10.2
     user: root
     command:
+      # Log to stderr.
       - -e
+      # Disable config file permissions checks. Allows mounting
+      # 'config/metricbeat.yml' even if it's not owned by root.
+      # see: https://www.elastic.co/guide/en/beats/libbeat/current/config-file-permissions.html
       - --strict.perms=false
     volumes:
-      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:ro,Z
+      - ./filebeat.yml:/usr/share/filebeat/filebeat.yml:rw,Z
       - type: bind
         source: /var/lib/docker/containers
         target: /var/lib/docker/containers
@@ -115,9 +114,9 @@ services:
         source: /var/run/docker.sock
         target: /var/run/docker.sock
         read_only: true
-    environment:
-      FILEBEAT_INTERNAL_PASSWORD: ${FILEBEAT_INTERNAL_PASSWORD:-}
-      BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
+    # environment:
+    #   FILEBEAT_INTERNAL_PASSWORD: ${FILEBEAT_INTERNAL_PASSWORD:-}
+    #   BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
     networks:
       - elk
     depends_on:
@@ -128,6 +127,8 @@ services:
     image: docker.elastic.co/beats/metricbeat:7.10.2
     user: root
     command:
+      # - modules enable docker kibana elasticsearch
+      # - setup --dashboards
       # Log to stderr.
       - -e
       # Disable config file permissions checks. Allows mounting
@@ -138,7 +139,7 @@ services:
       # from within a container.
       - --system.hostfs=/hostfs
     volumes:
-      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:ro,Z
+      - ./metricbeat.yml:/usr/share/metricbeat/metricbeat.yml:rw,Z
       - type: bind
         source: /
         target: /hostfs
@@ -155,89 +156,56 @@ services:
         source: /var/run/docker.sock
         target: /var/run/docker.sock
         read_only: true
-    environment:
-      METRICBEAT_INTERNAL_PASSWORD: ${METRICBEAT_INTERNAL_PASSWORD:-}
-      MONITORING_INTERNAL_PASSWORD: ${MONITORING_INTERNAL_PASSWORD:-}
-      BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
-    networks:
-      - elk
-    depends_on:
-      - elasticsearch
+  #   environment:
+  #     METRICBEAT_INTERNAL_PASSWORD: ${METRICBEAT_INTERNAL_PASSWORD:-}
+  #     MONITORING_INTERNAL_PASSWORD: ${MONITORING_INTERNAL_PASSWORD:-}
+  #     BEATS_SYSTEM_PASSWORD: ${BEATS_SYSTEM_PASSWORD:-}
+  #   networks:
+  #     - elk
+  #   depends_on:
+  #     - elasticsearch
 
-  enterprise-search:
-    container_name: enterprise-search
-    image: docker.elastic.co/enterprise-search/enterprise-search:7.10.2
-    volumes:
-      - ./enterprise-search.yml:/usr/share/enterprise-search/config/enterprise-search.yml:ro,Z
-    environment:
-      JAVA_OPTS: -Xms2g -Xmx2g
-      ENT_SEARCH_DEFAULT_PASSWORD: 'changeme'
-      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
-    ports:
-      - 3002:3002
-    networks:
-      - elk
-    depends_on:
-      - elasticsearch
+  # enterprise-search:
+  #   container_name: enterprise-search
+  #   image: docker.elastic.co/enterprise-search/enterprise-search:7.10.2
+  #   volumes:
+  #     - ./enterprise-search.yml:/usr/share/enterprise-search/config/enterprise-search.yml:ro,Z
+  #   environment:
+  #     JAVA_OPTS: -Xms2g -Xmx2g
+  #     ENT_SEARCH_DEFAULT_PASSWORD: 'changeme'
+  #     ELASTIC_PASSWORD: ${ELASTIC_PASSWORD:-}
+  #   ports:
+  #     - 3002:3002
+  #   networks:
+  #     - elk
+  #   depends_on:
+  #     - elasticsearch
 
-  apm-server:
-    container_name: apm-server
-    image: docker.elastic.co/beats/elastic-agent:7.10.2
-    volumes:
-      - apm-server:/usr/share/elastic-agent/state:Z
-    command:
-      - mkdir state
-    environment:
-      FLEET_ENROLL: '1'
-      FLEET_TOKEN_POLICY_NAME: Agent Policy APM Server
-      FLEET_INSECURE: '1'
-      FLEET_URL: http://fleet-server:8220
-      # Enrollment.
-      # (a) Auto-enroll using basic authentication
-      ELASTICSEARCH_USERNAME: elastic
-      ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD:-}
-      # (b) Enroll using a pre-generated enrollment token
-      #FLEET_ENROLLMENT_TOKEN: <enrollment_token>
-    ports:
-      - 8200:8200
-    hostname: apm-server
-    # Elastic Agent does not retry failed connections to Kibana upon the initial enrollment phase.
-    restart: on-failure
-    networks:
-      - elk
-    depends_on:
-      - elasticsearch
-      - kibana
-      - fleet-server
-
-  fleet-server:
-    container_name: fleet-server
-    image: docker.elastic.co/beats/elastic-agent:7.10.2
-    volumes:
-      - fleet-server:/usr/share/elastic-agent/state:Z
-    command:
-      - mkdir state
-    environment:
-      FLEET_SERVER_ENABLE: '1'
-      FLEET_SERVER_INSECURE_HTTP: '1'
-      FLEET_SERVER_HOST: 0.0.0.0
-      FLEET_SERVER_POLICY_ID: fleet-server-policy
-      # Fleet plugin in Kibana
-      KIBANA_FLEET_SETUP: '1'
-      # Enrollment.
-      # (a) Auto-enroll using basic authentication
-      ELASTICSEARCH_USERNAME: elastic
-      ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD:-}
-      # (b) Enroll using a pre-generated service token
-      #FLEET_SERVER_SERVICE_TOKEN: <service_token>
-    ports:
-      - 8220:8220
-    hostname: fleet-server
-    # Elastic Agent does not retry failed connections to Kibana upon the initial enrollment phase.
-    restart: on-failure
-    networks:
-      - elk
-    depends_on:
-      - elasticsearch
-      - kibana
+  # apm-server:
+  #   container_name: apm-server
+  #   image: docker.elastic.co/beats/elastic-agent:7.10.2
+  #   volumes:
+  #     - apm-server:/usr/share/elastic-agent/state:Z
+  #   command:
+  #     - mkdir state
+  #   environment:
+  #     FLEET_ENROLL: '1'
+  #     FLEET_TOKEN_POLICY_NAME: Agent Policy APM Server
+  #     FLEET_INSECURE: '1'
+  #     FLEET_URL: http://fleet-server:8220
+  #     # Enrollment.
+  #     # (a) Auto-enroll using basic authentication
+  #     ELASTICSEARCH_USERNAME: elastic
+  #     ELASTICSEARCH_PASSWORD: ${ELASTIC_PASSWORD:-}
+  #     # (b) Enroll using a pre-generated enrollment token
+  #     #FLEET_ENROLLMENT_TOKEN: <enrollment_token>
+  #   ports:
+  #     - 8200:8200
+  #   hostname: apm-server
+  #   # Elastic Agent does not retry failed connections to Kibana upon the initial enrollment phase.
+  #   restart: on-failure
+  #   networks:
+  #     - elk
+  #   depends_on:
+  #     - elasticsearch
 

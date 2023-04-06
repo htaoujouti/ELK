@@ -18,21 +18,21 @@ metricbeat.autodiscover:
 metricbeat.modules:
 - module: elasticsearch
   hosts: [ http://elasticsearch:9200 ]
-  username: monitoring_internal
-  password: ${MONITORING_INTERNAL_PASSWORD}
-  xpack.enabled: true
+  # username: monitoring_internal
+  # password: ${MONITORING_INTERNAL_PASSWORD}
+  # xpack.enabled: true
   period: 10s
   enabled: true
 - module: logstash
   hosts: [ http://logstash:9600 ]
-  xpack.enabled: true
+  # xpack.enabled: true
   period: 10s
   enabled: true
 - module: kibana
   hosts: [ http://kibana:5601 ]
-  username: monitoring_internal
-  password: ${MONITORING_INTERNAL_PASSWORD}
-  xpack.enabled: true
+  # username: monitoring_internal
+  # password: ${MONITORING_INTERNAL_PASSWORD}
+  # xpack.enabled: true
   period: 10s
   enabled: true
 - module: docker
@@ -55,14 +55,18 @@ processors:
 monitoring:
   enabled: true
   elasticsearch:
-    username: beats_system
-    password: ${BEATS_SYSTEM_PASSWORD}
+    # username: beats_system
+    # password: ${BEATS_SYSTEM_PASSWORD}
 
 output.elasticsearch:
   hosts: [ http://elasticsearch:9200 ]
-  username: metricbeat_internal
-  password: ${METRICBEAT_INTERNAL_PASSWORD}
-
+  # username: metricbeat_internal
+  # password: ${METRICBEAT_INTERNAL_PASSWORD}
+  
+output.logstash:
+  hosts: ["logstash:5044"]
+setup.kibana:
+  host: "http://kibana:5601/"
 ## HTTP endpoint for health checking
 ## https://www.elastic.co/guide/en/beats/metricbeat/current/http-endpoint.html
 #

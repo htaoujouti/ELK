@@ -16,6 +16,8 @@ heartbeat.monitors:
   schedule: '@every 5s'
   hosts:
     - elasticsearch
+    - kibana
+    - logstash
 
 processors:
 - add_cloud_metadata: ~
@@ -23,14 +25,15 @@ processors:
 monitoring:
   enabled: true
   elasticsearch:
-    username: beats_system
-    password: ${BEATS_SYSTEM_PASSWORD}
+    # username: beats_system
+    # password: ${BEATS_SYSTEM_PASSWORD}
 
-output.elasticsearch:
-  hosts: [ http://elasticsearch:9200 ]
-  username: heartbeat_internal
-  password: ${HEARTBEAT_INTERNAL_PASSWORD}
-
+# output.elasticsearch:
+#   hosts: [ http://elasticsearch:9200 ]
+output.logstash:
+  hosts: ["logstash:5044"]
+setup.kibana:
+  host: "http://kibana:5601/"
 ## HTTP endpoint for health checking
 ## https://www.elastic.co/guide/en/beats/heartbeat/current/http-endpoint.html
 #
